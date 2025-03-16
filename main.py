@@ -2,9 +2,11 @@ import os
 from typing import Annotated
 from database.entities import Transaction, User
 from request import TransactionRQ, UserRQ
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, HTTPException, Header
 from bcrypt import checkpw
 import jwt
+
+from utils import extract_email
 
 app = FastAPI()
 
@@ -17,14 +19,16 @@ def get_users():
     return User.get_all_users()
 
 
-@app.post("/register")
+@app.post("/register", status_code=201)
 def register(user_rq: UserRQ):
     try:
         User.insert_user(email=user_rq.email, password=user_rq.password)
-        return {"code": 201, "message": "user created"}
+        return f"user {user_rq.email} created"
     except Exception as e:
         if str(e) == "UNIQUE constraint failed: user.email":
-            return {"code": 400, "message": f"user {user_rq.email} already exists"}
+            raise HTTPException(
+                status_code=400, detail=f"user {user_rq.email} already exists"
+            )
         else:
             return e
 
@@ -39,25 +43,38 @@ def login(user_rq: UserRQ):
             algorithm="HS256",
         )
     else:
-        return {"code": 401, "message": "unauthorized"}
+        raise HTTPException(status_code=401, detail="unauthorized")
 
 
 @app.get("/transaction")
 def get_all_transactions_by_user(authorization: Annotated[str | None, Header()] = None):
-    token = authorization.split("Bearer ")[1]
-    email = jwt.decode(token, os.environ.get("JWT_SECRET"), algorithms=["HS256"])[
-        "email"
-    ]
+    email = extract_email(authorization)
 
     if email:
         user = User.get_user_where_email(email)
         transactions = Transaction.get_all_transactions_by_user(user)
         return transactions
     else:
-        return {"code": 401, "message": "unauthorized"}
+        raise HTTPException(status_code=401, detail="unauthorized")
 
 
-@app.post("/transaction")
+@app.get("/transaction/")
+def get_transactions_from_to(
+    from_date: str, to_date: str = None, authorization: Annotated[str | None, Header()] = None
+):
+    email = extract_email(authorization)
+
+    if email:
+        user = User.get_user_where_email(email)
+        transactions = Transaction.get_transactions_between(
+            user=user, from_date=from_date, to_date=to_date
+        )
+        return transactions
+    else:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
+@app.post("/transaction", status_code=201)
 def create_transactions(
     transaction_rq: TransactionRQ, authorization: Annotated[str | None, Header()] = None
 ):
@@ -67,6 +84,11 @@ def create_transactions(
     ]
 
     if email:
+        if transaction_rq.category not in ["food", "rent", "luxury", "other"]:
+            return {
+                "code": 400,
+                "message": f"wrong transaction category -> {transaction_rq.category}",
+            }
         user = User.get_user_where_email(email)
         Transaction.insert_transaction(
             user=user,
@@ -74,6 +96,6 @@ def create_transactions(
             category=transaction_rq.category,
             description=transaction_rq.description,
         )
-        return {"code": 201, "message": f"transaction created for user {user.email}"}
+        return f"transaction created for user {user.email}"
     else:
-        return {"code": 401, "message": "unauthorized"}
+        raise HTTPException(status_code=401, detail="unauthorized")
