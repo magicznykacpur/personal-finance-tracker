@@ -60,7 +60,9 @@ def get_all_transactions_by_user(authorization: Annotated[str | None, Header()] 
 
 @app.get("/transaction/")
 def get_transactions_from_to(
-    from_date: str, to_date: str = None, authorization: Annotated[str | None, Header()] = None
+    from_date: str,
+    to_date: str,
+    authorization: Annotated[str | None, Header()] = None,
 ):
     email = extract_email(authorization)
 
@@ -78,17 +80,15 @@ def get_transactions_from_to(
 def create_transactions(
     transaction_rq: TransactionRQ, authorization: Annotated[str | None, Header()] = None
 ):
-    token = authorization.split("Bearer ")[1]
-    email = jwt.decode(token, os.environ.get("JWT_SECRET"), algorithms=["HS256"])[
-        "email"
-    ]
+    email = extract_email(authorization)
 
     if email:
         if transaction_rq.category not in ["food", "rent", "luxury", "other"]:
-            return {
-                "code": 400,
-                "message": f"wrong transaction category -> {transaction_rq.category}",
-            }
+            raise HTTPException(
+                status_code=400,
+                detail=f"wrong transaction category -> {transaction_rq.category}",
+            )
+
         user = User.get_user_where_email(email)
         Transaction.insert_transaction(
             user=user,
