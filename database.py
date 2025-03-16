@@ -1,4 +1,5 @@
 import datetime
+from bcrypt import gensalt, hashpw
 from peewee import *
 
 sqlite_database = SqliteDatabase(":memory:")
@@ -18,18 +19,18 @@ class User(BaseModel):
         users = User.select()
         return list(map(lambda user: user, users))
 
-    def get_user_where_email(self, email):
-        return User.select().where(email)
+    def get_user_where_email(self, email: str):
+        return User.select().where(User.email == email).get()
 
-    def insert_user(self, email, password):
+    def insert_user(self, email: str, password: str):
+        hashed_pwd = hashpw(password.encode(), gensalt())
         User.insert(
-            email=email, password=password, created_at=datetime.datetime.now()
+            email=email, password=hashed_pwd, created_at=datetime.datetime.now()
         ).execute()
 
     def __repr__(self):
-        return f"email: {self.email}, created_at: {self.created_at}"
+        return f"email: {self.email}, password: {self.password}, created_at: {self.created_at}"
 
 
 def create_tables():
-    with sqlite_database:
-        sqlite_database.create_tables([User])
+    User.create_table()

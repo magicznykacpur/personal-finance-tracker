@@ -1,3 +1,3 @@
 #!/bin/bash
 
-pytest -v --color-yes
+python3 -m pytest
