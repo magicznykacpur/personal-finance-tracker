@@ -19,6 +19,33 @@ def get_users():
     return User.get_all_users()
 
 
+@app.get("/me")
+def get_my_data(authorization: Annotated[str | None, Header()] = None):
+    email = extract_email(authorization)
+
+    if email:
+        user = User.get_user_where_email(email)
+        transactions = list(
+            map(
+                lambda transaction: {
+                    "amount": transaction.amount,
+                    "category": transaction.category,
+                    "description": transaction.description,
+                    "created_at": transaction.created_at,
+                },
+                Transaction.get_all_transactions_by_user(user),
+            )
+        )
+        return {
+            "email": user.email,
+            "created_at": user.created_at,
+            "budget": user.budget,
+            "transactions": transactions,
+        }
+    else:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
 @app.post("/register", status_code=201)
 def register(user_rq: UserRQ):
     try:
@@ -31,6 +58,21 @@ def register(user_rq: UserRQ):
             )
         else:
             return e
+
+
+@app.patch("/user")
+def set_budget(budget: float, authorization: Annotated[str | None, Header()] = None):
+    email = extract_email(authorization)
+
+    if budget < 0:
+        raise HTTPException(status_code=400, detail="cannot set negative budget")
+
+    if email:
+        user = User.get_user_where_email(email)
+        User.set_user_budget(user.id, budget)
+        return f"budget of {budget} for {email} was set successfully"
+    else:
+        raise HTTPException(status_code=401, detail="unauthorized")
 
 
 @app.post("/login")
@@ -95,6 +137,9 @@ def create_transactions(
             amount=transaction_rq.amount,
             category=transaction_rq.category,
             description=transaction_rq.description,
+        )
+        User.set_user_budget(
+            user_id=user.id, budget=user.budget - transaction_rq.amount
         )
         return f"transaction created for user {user.email}"
     else:

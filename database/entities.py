@@ -19,6 +19,7 @@ class User(BaseModel):
     email = CharField(unique=True)
     password = CharField()
     created_at = DateTimeField()
+    budget = FloatField(default=0)
 
     def get_all_users():
         users = User.select()
@@ -32,6 +33,9 @@ class User(BaseModel):
         User.insert(
             email=email, password=hashed_pwd, created_at=datetime.datetime.now()
         ).execute()
+
+    def set_user_budget(user_id: int, budget: float):
+        User.update(budget=budget).where(User.id == user_id).execute()
 
     def __repr__(self):
         return f"email: {self.email}, password: {self.password}, created_at: {self.created_at}"
