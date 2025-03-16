@@ -1,8 +1,13 @@
 import datetime
+import os
 from bcrypt import gensalt, hashpw
 from peewee import *
 
-sqlite_database = SqliteDatabase("local.db")
+pytest_running = os.environ.get("PYTEST_RUNNING") == "True"
+database_location = ":memory:" if pytest_running else "local.db"
+
+
+sqlite_database = SqliteDatabase(database_location)
 
 
 class BaseModel(Model):
