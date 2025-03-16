@@ -54,3 +54,13 @@ def test_should_not_get_user_when_not_found():
         User.get_user_where_email(test_email)
 
     assert "instance matching query does not exist" in str(exc_info.value)
+
+def test_should_set_users_budget():
+    test_email = "test@user.com"
+    user = User.get_user_where_email(test_email)
+
+    assert user.budget == 0.0
+
+    User.set_user_budget(user_id=user.id, budget=21.37)
+
+    assert User.get_user_where_email(test_email).budget == 21.37
