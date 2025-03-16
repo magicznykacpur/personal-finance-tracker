@@ -62,10 +62,14 @@ class Transaction(BaseModel):
         return list(map(lambda transaction: transaction, transactions))
 
     def get_transactions_between(user: User, from_date: str, to_date: str):
-
         transactions = Transaction.select().where(
             (Transaction.user == user)
             & (Transaction.created_at >= datetime.datetime.fromisoformat(from_date))
             & (Transaction.created_at <= datetime.datetime.fromisoformat(to_date))
         )
         return list(map(lambda transaction: transaction, transactions))
+
+    def get_transaction_where_user_and_id(user: User, transaction_id: int):
+        return Transaction.get(
+            (Transaction.user == user) & (Transaction.id == transaction_id)
+        )

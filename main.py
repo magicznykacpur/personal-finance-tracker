@@ -100,6 +100,46 @@ def get_all_transactions_by_user(authorization: Annotated[str | None, Header()] 
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
+@app.get("/transaction/{id}")
+def get_transaction_by_id(
+    id: int, authorization: Annotated[str | None, Header()] = None
+):
+    email = extract_email(authorization)
+
+    if email:
+        user = User.get_user_where_email(email)
+        try:
+            transaction = Transaction.get_transaction_where_user_and_id(
+                user=user, transaction_id=id
+            )
+
+            return transaction
+        except Exception as e:
+            raise HTTPException(status_code=404, detail="transaction not found")
+    else:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
+@app.delete("/transaction/{id}")
+def delete_transaction_by_id(
+    id: int, authorization: Annotated[str | None, Header()] = None
+):
+    email = extract_email(authorization)
+
+    if email:
+        user = User.get_user_where_email(email)
+        try:
+            transaction = Transaction.get_transaction_where_user_and_id(
+                user=user, transaction_id=id
+            )
+            transaction.delete_instance()
+            return f"transaction -> {id} <- deleted"
+        except Exception as e:
+            raise HTTPException(status_code=404, detail="transaction not found")
+    else:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
 @app.get("/transaction/")
 def get_transactions_from_to(
     from_date: str,
@@ -134,7 +174,7 @@ def create_transactions(
         user = User.get_user_where_email(email)
         if user.budget < transaction_rq.amount:
             raise HTTPException(status_code=400, detail="insufficient budget")
-        
+
         Transaction.insert_transaction(
             user=user,
             amount=transaction_rq.amount,
