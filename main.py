@@ -132,6 +132,9 @@ def create_transactions(
             )
 
         user = User.get_user_where_email(email)
+        if user.budget < transaction_rq.amount:
+            raise HTTPException(status_code=400, detail="insufficient budget")
+        
         Transaction.insert_transaction(
             user=user,
             amount=transaction_rq.amount,
