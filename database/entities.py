@@ -1,7 +1,9 @@
-import datetime
+from datetime import datetime
 import os
 from bcrypt import gensalt, hashpw
 from peewee import *
+
+from utils import get_dates_around_month
 
 pytest_running = os.environ.get("PYTEST_RUNNING") == "True"
 database_location = ":memory:" if pytest_running else "local.db"
@@ -64,8 +66,8 @@ class Transaction(BaseModel):
     def get_transactions_between(user: User, from_date: str, to_date: str):
         transactions = Transaction.select().where(
             (Transaction.user == user)
-            & (Transaction.created_at >= datetime.datetime.fromisoformat(from_date))
-            & (Transaction.created_at <= datetime.datetime.fromisoformat(to_date))
+            & (Transaction.created_at >= datetime.fromisoformat(from_date))
+            & (Transaction.created_at <= datetime.fromisoformat(to_date))
         )
         return list(map(lambda transaction: transaction, transactions))
 
@@ -73,3 +75,16 @@ class Transaction(BaseModel):
         return Transaction.get(
             (Transaction.user == user) & (Transaction.id == transaction_id)
         )
+
+    def get_transactions_where_user_and_month_and_category(
+        user: User, month: int, category: str
+    ):
+        current_month, next_month = get_dates_around_month(month)
+
+        transactions = Transaction.select().where(
+            (Transaction.user == user)
+            & (Transaction.created_at >= current_month)
+            & (Transaction.created_at <= next_month)
+            & (Transaction.category == category)
+        )
+        return list(map(lambda transaction: transaction, transactions))

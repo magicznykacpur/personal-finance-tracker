@@ -1,3 +1,5 @@
+from datetime import datetime
+from functools import reduce
 import os
 from typing import Annotated
 from database.entities import Transaction, User
@@ -6,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Header
 from bcrypt import checkpw
 import jwt
 
-from utils import extract_email
+from utils import extract_email, get_dates_around_month
 
 app = FastAPI()
 
@@ -185,5 +187,28 @@ def create_transactions(
             user_id=user.id, budget=user.budget - transaction_rq.amount
         )
         return f"transaction created for user {user.email}"
+    else:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
+@app.get("/report")
+def get_month_report_for_category(
+    month: str, category: str, authorization: Annotated[str | None, Header()] = None
+):
+    email = extract_email(authorization)
+
+    if email:
+        user = User.get_user_where_email(email)
+        transactions = Transaction.get_transactions_where_user_and_month_and_category(
+            user=user, month=month, category=category
+        )
+
+        total = reduce(lambda x, y: x + y.amount, transactions, 0)
+        current_year = datetime.now().year
+
+        if total == 0:
+            return {"total": total, "message": f"you've spent 0 on `{category}` in {current_year}-{month}. bloody legend."}
+        else:
+            return {"total": total, "message": f"in {current_year}-{month} you've spent a total of {total} on `{category}`. damn..."}
     else:
         raise HTTPException(status_code=401, detail="unauthorized")
