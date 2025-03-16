@@ -8,7 +8,7 @@ import jwt
 
 app = FastAPI()
 
-env = open(".env").read().split("=")
+env = open(".env.local").read().split("=")
 os.environ[env[0]] = env[1]
 
 
