@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Header
 from bcrypt import checkpw
 import jwt
 
-from utils import extract_email, get_dates_around_month
+from utils import extract_email
 
 app = FastAPI()
 
