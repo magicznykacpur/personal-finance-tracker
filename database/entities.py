@@ -2,6 +2,7 @@ from datetime import datetime
 import os
 from bcrypt import gensalt, hashpw
 from peewee import *
+from playhouse.sqlite_ext import JSONField
 
 from utils import get_dates_around_month
 
@@ -22,6 +23,7 @@ class User(BaseModel):
     password = CharField()
     created_at = DateTimeField()
     budget = FloatField(default=0)
+    categories_limit = JSONField()
 
     def get_all_users():
         users = User.select()
@@ -76,8 +78,17 @@ class Transaction(BaseModel):
             (Transaction.user == user) & (Transaction.id == transaction_id)
         )
 
+    def transactions_where_user_and_month(user: User, month: str):
+        current_month, next_month = get_dates_around_month(month)
+        transactions = Transaction.select().where(
+            (Transaction.user == user)
+            & (Transaction.created_at >= current_month)
+            & (Transaction.created_at <= next_month)
+        )
+        return list(map(lambda transaction: transaction, transactions))
+
     def get_transactions_where_user_and_month_and_category(
-        user: User, month: int, category: str
+        user: User, month: str, category: str
     ):
         current_month, next_month = get_dates_around_month(month)
 

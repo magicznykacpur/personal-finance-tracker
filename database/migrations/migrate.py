@@ -1,4 +1,6 @@
+from m_002_categories_limit_user import categories_limit_002
 from m_001_budget_user import budget_user_001
 
 
 budget_user_001()
+categories_limit_002()
