@@ -41,6 +41,13 @@ class User(BaseModel):
     def set_user_budget(user_id: int, budget: float):
         User.update(budget=budget).where(User.id == user_id).execute()
 
+    def set_users_categories_limit(user_id: int, categories_limit: dict):
+        user = User.get(User.id == user_id)
+        users_limits = user.categories_limit
+        users_limits.update(categories_limit)
+        user.categories_limit = users_limits
+        user.save()
+        
     def __repr__(self):
         return f"email: {self.email}, password: {self.password}, created_at: {self.created_at}"
 
@@ -57,7 +64,7 @@ class Transaction(BaseModel):
             user=user,
             amount=amount,
             category=category,
-            created_at=datetime.datetime.now(),
+            created_at=datetime.now(),
             description=description,
         ).execute()
 

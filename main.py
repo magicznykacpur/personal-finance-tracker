@@ -3,12 +3,12 @@ from functools import reduce
 import os
 from typing import Annotated
 from database.entities import Transaction, User
-from request import TransactionRQ, UserRQ
+from request import CategoriesLimitRQ, TransactionRQ, UserRQ
 from fastapi import FastAPI, HTTPException, Header
 from bcrypt import checkpw
 import jwt
 
-from utils import extract_email
+from utils import extract_email, print_fail, print_warning
 
 app = FastAPI()
 
@@ -42,6 +42,7 @@ def get_my_data(authorization: Annotated[str | None, Header()] = None):
             "email": user.email,
             "created_at": user.created_at,
             "budget": user.budget,
+            "categories_limit": user.categories_limit,
             "transactions": transactions,
         }
     else:
@@ -177,6 +178,17 @@ def create_transactions(
         if user.budget < transaction_rq.amount:
             raise HTTPException(status_code=400, detail="insufficient budget")
 
+        budget_for_category = user.categories_limit[transaction_rq.category]
+        if (
+            budget_for_category - transaction_rq.amount <= 10
+            and budget_for_category - transaction_rq.amount > 0
+        ):
+            print_warning(
+                f"You're about to exceed limit for {transaction_rq.category} category..."
+            )
+        elif budget_for_category - transaction_rq.amount < 0:
+            print_fail(f"Budget for {transaction_rq.category} category exceeded!")
+
         Transaction.insert_transaction(
             user=user,
             amount=transaction_rq.amount,
@@ -186,12 +198,16 @@ def create_transactions(
         User.set_user_budget(
             user_id=user.id, budget=user.budget - transaction_rq.amount
         )
+        users_limits = user.categories_limit
+        users_limits[transaction_rq.category] -= transaction_rq.amount
+        User.set_users_categories_limit(user_id=user.id, categories_limit=users_limits)
+
         return f"transaction created for user {user.email}"
     else:
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
-@app.get("/report")
+@app.get("/report/month-and-category")
 def get_month_report_for_category(
     month: str, category: str, authorization: Annotated[str | None, Header()] = None
 ):
@@ -203,12 +219,75 @@ def get_month_report_for_category(
             user=user, month=month, category=category
         )
 
-        total = reduce(lambda x, y: x + y.amount, transactions, 0)
+        total = round(reduce(lambda x, y: x + y.amount, transactions, 0), 2)
         current_year = datetime.now().year
 
         if total == 0:
-            return {"total": total, "message": f"you've spent 0 on `{category}` in {current_year}-{month}. bloody legend."}
+            return {
+                "total": total,
+                "message": f"you've spent 0 on `{category}` in {current_year}-{month}. bloody legend.",
+            }
         else:
-            return {"total": total, "message": f"in {current_year}-{month} you've spent a total of {total} on `{category}`. damn..."}
+            return {
+                "total": total,
+                "message": f"in {current_year}-{month} you've spent a total of {total} on `{category}`. damn...",
+            }
+    else:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
+@app.get("/report/month")
+def get_month_total(month: str, authorization: Annotated[str | None, Header()] = None):
+    email = extract_email(authorization)
+
+    if email:
+        user = User.get_user_where_email(email)
+        transactions = Transaction.transactions_where_user_and_month(
+            user=user, month=month
+        )
+
+        total = round(reduce(lambda x, y: x + y.amount, transactions, 0), 2)
+        current_year = datetime.now().year
+
+        if total == 0:
+            return {
+                "total": total,
+                "message": f"you've spent `0` in {current_year}-{month}. bloody legend.",
+            }
+        else:
+            return {
+                "total": total,
+                "message": f"you've spent `{total}` in {current_year}-{month}. damn...",
+            }
+    else:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
+@app.patch("/categories-limit")
+def set_users_categories_limit(
+    categories_limit: CategoriesLimitRQ,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    email = extract_email(authorization)
+
+    if email:
+        user = User.get_user_where_email(email)
+        users_limits = user.categories_limit
+        new_limits = {}
+
+        if categories_limit.food:
+            new_limits["food"] = categories_limit.food
+        if categories_limit.rent:
+            new_limits["rent"] = categories_limit.rent
+        if categories_limit.luxury:
+            new_limits["luxury"] = categories_limit.luxury
+        if categories_limit.other:
+            new_limits["other"] = categories_limit.other
+
+        users_limits.update(new_limits)
+        user.categories_limit = users_limits
+        user.save()
+
+        return {"new_users_limits": users_limits, "message": "limits updated"}
     else:
         raise HTTPException(status_code=401, detail="unauthorized")
